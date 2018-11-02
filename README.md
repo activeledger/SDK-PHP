@@ -2,7 +2,7 @@
 
 # Activeledger - PHP SDK
 
-The Activeledger PHP SDK has been build to provide an easy way to connect your php web application to an Activeledger Network
+The Activeledger PHP SDK has been built to provide an easy way to connect your php web application to an Activeledger Network
 
 ### Activeledger
 
