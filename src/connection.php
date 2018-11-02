@@ -137,22 +137,40 @@ class Connection
      */
     public function send($txBody)
     {
+        // Convert Body to string
+        $content = json_encode($txBody, JSON_UNESCAPED_SLASHES);
+
         // Encrypted Connection?
         if ($this->_pem) {
-            // Encrypt with the nodes public address
-            openssl_public_encrypt(
-                json_encode($txBody, JSON_UNESCAPED_SLASHES),
-                $encrypted,
-                $this->_pem,
-                OPENSSL_PKCS1_OAEP_PADDING
-            );
 
-            // Submit Transaction as Base54 Encoded body
-            return $this->_submit(base64_encode($encrypted));
+            // Split String into encryptable chunks
+            $chunks = str_split($content, 116);
+
+            // Stores concatenated encrypted chunks
+            $encryptedContent = "";
+
+            // Loop chunks and encrypt
+            foreach ($chunks as $chunk) {
+                if (openssl_public_encrypt(
+                    $chunk,
+                    $encrypted,
+                    $this->_pem,
+                    OPENSSL_PKCS1_PADDING
+                )
+                ) {
+                    // Append encryption
+                    $encryptedContent .= $encrypted;
+                } else {
+                    throw new \Exception("Failed to encrypt");
+                }
+            }
+
+            // Update Content with base64 encoded encrypted
+            $content = base64_encode($encryptedContent);
         }
 
         // Normal Transaction Send as JSON
-        $response = $this->_submit(json_encode($txBody, JSON_UNESCAPED_SLASHES));
+        $response = $this->_submit($content);
         
         // Did we get a response?
         if ($response && $response->{'$umid'}) {
