@@ -16,16 +16,19 @@
     ],
     "homepage": "http://www.activeledger.io",
     "license": "MIT",
-    "authors": [
-        {
+    "authors": [{
             "name": "Activeledger"
+        },
+        {
+            "name": "Chris",
+            "email": "4070267+chris-holdt@users.noreply.github.com"
         }
     ],
     "require": {
-        "php" : "~5.6|~7.0"
+        "php": "~5.6|~7.0"
     },
     "require-dev": {
-        "phpunit/phpunit" : ">=5.4.3",
+        "phpunit/phpunit": ">=5.4.3",
         "squizlabs/php_codesniffer": "^2.3"
     },
     "autoload": {
