@@ -70,14 +70,16 @@ final class Secp256k1Test extends TestCase
      */
     public function testHighSSignaturesFromElsewhereStillVerify(): void
     {
-        $seen = 0;
-
         foreach ($this->vectors() as $v) {
-            $signature = base64_decode($v['signature']);
-            if (!Secp256k1KeyPair::isHighS($signature)) {
-                continue;
-            }
-            $seen++;
+            $signature = base64_decode($v['highSSignature']);
+
+            // The fixture must be what it claims. A "high-S" signature that is
+            // not high-S would pass a permissive verifier for the wrong
+            // reason: green, and proving nothing.
+            self::assertTrue(
+                Secp256k1KeyPair::isHighS($signature),
+                "{$v['messageName']}/{$v['publicKeyForm']}: the published fixture is not high-S"
+            );
 
             $key = Secp256k1KeyPair::fromPublicKey($v['publicKey']);
             self::assertTrue(
@@ -86,12 +88,21 @@ final class Secp256k1Test extends TestCase
                 . '- low-S is being enforced on verify'
             );
         }
+    }
 
-        self::assertGreaterThan(
-            0,
-            $seen,
-            'the published vectors no longer contain a high-S signature, so this proves nothing'
-        );
+    /**
+     * Permissive about s only. Accepting high-S must not have quietly widened
+     * anything else.
+     */
+    public function testTheHighSFormStillRejectsATamperedMessage(): void
+    {
+        foreach ($this->vectors() as $v) {
+            $key = Secp256k1KeyPair::fromPublicKey($v['publicKey']);
+
+            self::assertFalse(
+                $key->verify($v['message'] . ' ', base64_decode($v['highSSignature']))
+            );
+        }
     }
 
     public function testEverySignatureEmittedIsLowS(): void
