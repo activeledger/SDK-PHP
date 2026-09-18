@@ -1,55 +1,34 @@
 {
     "name": "activeledger/sdk",
     "type": "library",
-    "description": "PHP package for use when integrating with Activeledger",
+    "description": "PHP SDK for Activeledger, with post-quantum identity support (ML-DSA-65)",
     "keywords": [
-        "activeledger",
-        "sdk",
-        "blockchain",
-        "dlt",
-        "distributed ledger technology",
-        "ledger",
-        "smart contracts",
-        "activeledger",
-        "network",
-        "node"
+        "activeledger", "sdk", "blockchain", "dlt",
+        "distributed ledger technology", "ledger", "smart contracts",
+        "post-quantum", "ml-dsa"
     ],
-    "homepage": "http://www.activeledger.io",
+    "homepage": "https://www.activeledger.io",
     "license": "MIT",
-    "authors": [{
-            "name": "Activeledger"
-        },
-        {
-            "name": "Chris",
-            "email": "4070267+chris-holdt@users.noreply.github.com"
-        }
+    "authors": [
+        { "name": "Activeledger" }
     ],
     "require": {
-        "php": "~5.6|~7.0"
+        "php": "^8.1",
+        "ext-curl": "*",
+        "ext-json": "*",
+        "paragonie/pqcrypto_compat": "^0.3"
     },
     "require-dev": {
-        "phpunit/phpunit": ">=5.4.3",
-        "squizlabs/php_codesniffer": "^2.3"
+        "phpunit/phpunit": "^10.5"
+    },
+    "suggest": {
+        "ext-pqcrypto": "Faster ML-DSA signing; pqcrypto_compat uses it automatically when present"
     },
     "autoload": {
-        "psr-4": {
-            "activeledger\\": "src"
-        }
+        "psr-4": { "Activeledger\\": "src/" }
     },
     "autoload-dev": {
-        "psr-4": {
-            "activeledger\\": "tests"
-        }
-    },
-    "scripts": {
-        "test": "phpunit",
-        "check-style": "phpcs -p --standard=PSR2 --runtime-set ignore_errors_on_exit 1 --runtime-set ignore_warnings_on_exit 1 src tests",
-        "fix-style": "phpcbf -p --standard=PSR2 --runtime-set ignore_errors_on_exit 1 --runtime-set ignore_warnings_on_exit 1 src tests"
-    },
-    "extra": {
-        "branch-alias": {
-            "dev-master": "1.0-dev"
-        }
+        "psr-4": { "Activeledger\\Tests\\": "tests/" }
     },
     "config": {
         "sort-packages": true

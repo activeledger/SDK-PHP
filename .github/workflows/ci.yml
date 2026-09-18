@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # The floor declared in composer.json, plus current. A library that
+        # only runs on its development version breaks for half its consumers.
+        php: ["8.1", "8.2", "8.3", "8.4"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, json
+          coverage: none
+
+      - name: Validate composer.json
+        run: composer validate --strict
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress
+
+      # Only the unit suite: the live suite needs a running 4-node ledger and
+      # skips itself without one, which would make a green run meaningless
+      # here rather than merely uninformative.
+      - name: Test
+        run: vendor/bin/phpunit --testsuite unit
