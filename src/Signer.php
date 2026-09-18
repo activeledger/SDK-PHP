@@ -15,8 +15,14 @@ interface Signer
 {
     public function keyType(): KeyType;
 
-    /** The public key, base64, in the encoding the ledger stores. */
-    public function publicKeyBase64(): string;
+    /**
+     * The public key, as the string the ledger stores.
+     *
+     * The encoding depends on the scheme, which is why this is not named for
+     * one: post-quantum keys are base64, and secp256k1 keys are 0x-prefixed
+     * hex. Whatever this returns goes into the transaction verbatim.
+     */
+    public function publicKey(): string;
 
     /**
      * Signs the canonical bytes of a `$tx` object, returning the raw

@@ -88,9 +88,9 @@ final class KeyPair implements Signer
      *
      * @throws \InvalidArgumentException
      */
-    public static function fromPublicKeyBase64(string $publicKeyBase64): self
+    public static function fromPublicKeyBase64(string $publicKey): self
     {
-        $bytes = self::decode($publicKeyBase64, 'public');
+        $bytes = self::decode($publicKey, 'public');
 
         if (strlen($bytes) !== self::PUBLIC_KEY_SIZE) {
             throw new \InvalidArgumentException(sprintf(
@@ -109,7 +109,7 @@ final class KeyPair implements Signer
     }
 
     /** The public key, base64, exactly as the ledger stores it. */
-    public function publicKeyBase64(): string
+    public function publicKey(): string
     {
         return base64_encode($this->verificationKey->bytes());
     }

@@ -27,6 +27,13 @@ enum KeyType: string
      */
     public static function fromWire(string $wire): self
     {
+        // The ledger routes these to identical secp256k1 verification, so an
+        // existing identity may already carry either. Accepted here and NEVER
+        // emitted: the enum's value is always "secp256k1".
+        if ($wire === 'bitcoin' || $wire === 'ethereum') {
+            return self::Secp256k1;
+        }
+
         return self::tryFrom($wire) ?? throw new \InvalidArgumentException(
             "Unknown key type '$wire' - expected rsa, secp256k1, ml-dsa-65 or falcon-512"
         );

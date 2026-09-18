@@ -137,8 +137,64 @@ final class LiveNetworkTest extends TestCase
         // The type the LEDGER stored. If this is "rsa", the SDK omitted it and
         // every later signature would fail verification.
         self::assertSame('ml-dsa-65', $authority['type']);
-        self::assertSame($key->publicKeyBase64(), $authority['public']);
+        self::assertSame($key->publicKey(), $authority['public']);
         self::assertSame(KeyPair::PUBLIC_KEY_SIZE, strlen(base64_decode($authority['public'])));
+    }
+
+    /**
+     * The ledger accepts both public key forms and tells them apart by
+     * length, so onboarding only ever with the compressed form would leave
+     * the other path unproven.
+     *
+     * @dataProvider secp256k1Forms
+     */
+    public function testSecp256k1IdentityOnboardsAndIsRecordedCorrectly(
+        bool $compressed,
+        int $expectedChars
+    ): void {
+        $client = $this->client();
+        $key = \Activeledger\Secp256k1KeyPair::generate($compressed);
+        $identity = $client->onboard($key);
+
+        self::assertNotSame('', $identity->streamId);
+
+        $authority = $this->awaitAuthorities(0, $identity->streamId)[0];
+        $stored = $authority['public'];
+
+        self::assertSame('secp256k1', $authority['type']);
+
+        // Stored as 0x-prefixed hex, NOT base64. If this ever comes back
+        // base64 the SDK has encoded it the post-quantum way, and every later
+        // signature fails as 1220.
+        self::assertStringStartsWith('0x', $stored, "the ledger stored '$stored', not 0x hex");
+        self::assertSame($expectedChars, strlen($stored));
+        self::assertSame($key->publicKey(), $stored);
+    }
+
+    /** @return array<string, array{bool, int}> */
+    public static function secp256k1Forms(): array
+    {
+        return [
+            'compressed' => [true, 68],
+            'uncompressed' => [false, 132],
+        ];
+    }
+
+    public function testASecp256k1SignedTransactionIsAccepted(): void
+    {
+        $client = $this->client();
+        $key = \Activeledger\Secp256k1KeyPair::generate();
+        $identity = $client->onboard($key);
+
+        $tx = Transaction::builder()
+            ->namespace('default')
+            ->contract('namespace')
+            ->input($identity->streamId, $key, ['namespace' => $this->unique('phpec')])
+            ->build();
+
+        $response = $client->submit($tx);
+
+        self::assertTrue($response->committed(), 'rejected: ' . $response->raw());
     }
 
     public function testATransactionSignedByThisSdkIsAccepted(): void

@@ -85,7 +85,7 @@ final class Transaction
             '$i' => [
                 $label => [
                     'type' => $signer->keyType()->value,
-                    'publicKey' => $signer->publicKeyBase64(),
+                    'publicKey' => $signer->publicKey(),
                 ],
             ],
             // Must serialise as {} rather than [].

@@ -32,7 +32,7 @@ final class TransactionTest extends TestCase
 
         $identity = $doc['$tx']['$i']['identity'];
         self::assertSame('ml-dsa-65', $identity['type']);
-        self::assertSame($key->publicKeyBase64(), $identity['publicKey']);
+        self::assertSame($key->publicKey(), $identity['publicKey']);
 
         // Keyed by the $i LABEL, not a stream id: there is no stream yet.
         self::assertArrayHasKey('identity', $doc['$sigs']);
