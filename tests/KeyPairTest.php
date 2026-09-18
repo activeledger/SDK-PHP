@@ -90,7 +90,7 @@ final class KeyPairTest extends TestCase
     {
         $key = KeyPair::generate();
 
-        self::assertSame(KeyPair::PUBLIC_KEY_SIZE, strlen(base64_decode($key->publicKeyBase64())));
+        self::assertSame(KeyPair::PUBLIC_KEY_SIZE, strlen(base64_decode($key->publicKey())));
         self::assertSame(KeyPair::SEED_SIZE, strlen(base64_decode($key->seedBase64())));
     }
 
@@ -134,7 +134,7 @@ final class KeyPairTest extends TestCase
         $original = KeyPair::generate();
         $restored = KeyPair::fromSeedBase64($original->seedBase64());
 
-        self::assertSame($original->publicKeyBase64(), $restored->publicKeyBase64());
+        self::assertSame($original->publicKey(), $restored->publicKey());
         self::assertTrue($original->verify('msg', $restored->sign('msg')));
         self::assertTrue($restored->verify('msg', $original->sign('msg')));
     }

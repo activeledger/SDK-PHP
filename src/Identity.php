@@ -13,8 +13,8 @@ final class Identity
     ) {
     }
 
-    public function publicKeyBase64(): string
+    public function publicKey(): string
     {
-        return $this->signer->publicKeyBase64();
+        return $this->signer->publicKey();
     }
 }

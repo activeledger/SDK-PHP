@@ -25,6 +25,19 @@ final class Vectors
     }
 
     /**
+     * Only the secp256k1 vectors.
+     *
+     * @return list<array<string, string>>
+     */
+    public static function secp256k1(): array
+    {
+        return array_values(array_filter(
+            self::all(),
+            static fn(array $v): bool => $v['type'] === 'secp256k1'
+        ));
+    }
+
+    /**
      * Only the ML-DSA-65 vectors. Falcon is not supported in PHP.
      *
      * @return list<array<string, string>>

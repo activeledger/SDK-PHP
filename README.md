@@ -43,6 +43,74 @@ If you need one identity shared between PHP and another language, generate it
 in PHP and give the other SDK only the public key, or use one of the other
 SDKs for signing.
 
+## Key types
+
+| Key type | Wire string | Public | Private | Signature | Encoding |
+|---|---|---|---|---|---|
+| ML-DSA-65 | `ml-dsa-65` | 1952 | 32-byte seed | 3309 | base64 |
+| secp256k1 | `secp256k1` | 33 or 65 | 32 | ~70-72, variable | `0x` hex |
+
+Use **secp256k1** unless the identity must outlive a cryptographically
+relevant quantum computer: roughly **22x smaller** per transaction, and every
+byte is stored on the ledger permanently and replicated to every node. It also
+works with hardware wallets and HSMs, is the only way to sign for an identity
+created before post-quantum support — and, unlike ML-DSA here, **its private
+keys are portable to and from every other Activeledger SDK**.
+
+```php
+use Activeledger\Secp256k1KeyPair;
+
+$key = Secp256k1KeyPair::generate();                      // compressed
+$full = Secp256k1KeyPair::generate(compressed: false);    // uncompressed
+
+$key->publicKey();    // "0x02a1b2..." - give this to the ledger
+$key->privateKey();   // store this; it works in any SDK
+
+$restored = Secp256k1KeyPair::fromKeys($key->publicKey(), $key->privateKey());
+$verifier = Secp256k1KeyPair::fromPublicKey($key->publicKey());
+```
+
+secp256k1 uses `ext-openssl`, which is enabled in virtually every PHP build
+and is **the same implementation the ledger verifies with** — so interop is
+structural rather than hopeful. No Composer package, and no `ext-gmp` (which
+`simplito/elliptic-php` requires outright).
+
+### Encoded nothing like the post-quantum keys
+
+- **Keys are `0x`-prefixed hex, not base64.** The prefix is required rather
+  than tolerated, because hex without it can decode as base64 into
+  plausible-looking bytes of the wrong length.
+- **Public keys have two valid lengths**, 33 compressed and 65 uncompressed,
+  and the ledger accepts both. A length and a SEC1 point prefix that disagree
+  are rejected by name.
+- **Private scalars are always 32 bytes**, left-padded.
+- **Signatures are SHA-256 → ECDSA → DER**, and DER length varies.
+
+### low-S, in both directions
+
+**Signing always emits low-S.** OpenSSL does not normalise, so this SDK folds
+S itself. Not for the ledger, which accepts either, but for `@noble/curves` —
+the reference for the JavaScript side — and for libsecp256k1 and Rust's
+`k256`, all of which reject high-S by default. A signer emitting high-S
+roughly half the time fails against those roughly half the time, which reads
+as flakiness rather than as a signature format problem.
+
+**Verification accepts high-S**, because the ledger produces it freely.
+Rejecting those would fail on roughly half of all valid signatures.
+
+### One difference from the other SDKs
+
+**Signing is not deterministic here.** OpenSSL uses a random k and offers no
+way to inject one, so unlike the JavaScript, JVM, C#, Go and Rust SDKs this
+one cannot reproduce the published RFC 6979 reference bytes — signing the same
+message twice gives different bytes.
+
+That costs a test, not correctness: everything it emits is a valid, canonical,
+low-S signature that the ledger and every other SDK accept, and the suite
+verifies the published deterministic signatures even though it cannot
+reproduce them. Implementing RFC 6979 in PHP would mean hand-rolling 256-bit
+modular arithmetic and point multiplication, which is a far worse trade.
+
 ## Install
 
 ```bash
