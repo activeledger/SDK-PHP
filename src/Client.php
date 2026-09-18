@@ -70,7 +70,10 @@ final class Client
 
         $raw = curl_exec($handle);
         $error = curl_error($handle);
-        curl_close($handle);
+        // No curl_close(): the handle is an object freed by refcount, the
+        // function has had no effect since PHP 8.0, and calling it is
+        // deprecated from 8.5.
+        unset($handle);
 
         if ($raw === false) {
             throw new \RuntimeException("Request to {$this->baseUrl} failed: $error");
@@ -194,7 +197,8 @@ final class Client
         $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
         $error = curl_error($handle);
         $errno = curl_errno($handle);
-        curl_close($handle);
+        // See submitRaw(): curl_close() is a deprecated no-op.
+        unset($handle);
 
         // Without this a rejected subscription becomes an empty event stream:
         // the caller waits for events that were never coming, and nothing
