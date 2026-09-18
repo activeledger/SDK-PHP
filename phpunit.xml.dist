@@ -4,7 +4,8 @@
          bootstrap="vendor/autoload.php"
          colors="true"
          failOnWarning="true"
-         failOnNotice="true">
+         failOnNotice="true"
+         failOnDeprecation="true">
     <testsuites>
         <testsuite name="unit">
             <directory>tests</directory>
