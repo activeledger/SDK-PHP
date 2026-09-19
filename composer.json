@@ -3,14 +3,22 @@
     "type": "library",
     "description": "PHP SDK for Activeledger, with post-quantum identity support (ML-DSA-65)",
     "keywords": [
-        "activeledger", "sdk", "blockchain", "dlt",
-        "distributed ledger technology", "ledger", "smart contracts",
-        "post-quantum", "ml-dsa"
+        "activeledger",
+        "sdk",
+        "blockchain",
+        "dlt",
+        "distributed ledger technology",
+        "ledger",
+        "smart contracts",
+        "post-quantum",
+        "ml-dsa"
     ],
     "homepage": "https://www.activeledger.io",
     "license": "MIT",
     "authors": [
-        { "name": "Activeledger" }
+        {
+            "name": "Activeledger"
+        }
     ],
     "require": {
         "php": "^8.1",
@@ -23,13 +31,18 @@
         "phpunit/phpunit": "^10.5"
     },
     "suggest": {
-        "ext-pqcrypto": "Faster ML-DSA signing; pqcrypto_compat uses it automatically when present"
+        "ext-pqcrypto": "Faster ML-DSA signing; pqcrypto_compat uses it automatically when present",
+        "ext-intl": "NFKD normalisation for non-ASCII BIP-39 passphrases; ASCII is unaffected"
     },
     "autoload": {
-        "psr-4": { "Activeledger\\": "src/" }
+        "psr-4": {
+            "Activeledger\\": "src/"
+        }
     },
     "autoload-dev": {
-        "psr-4": { "Activeledger\\Tests\\": "tests/" }
+        "psr-4": {
+            "Activeledger\\Tests\\": "tests/"
+        }
     },
     "config": {
         "sort-packages": true

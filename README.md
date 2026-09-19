@@ -11,18 +11,16 @@ identities.
 - Transaction builder, client and server-sent event subscriptions
 - Pure PHP — no extension required, no native library to install
 
-## Read this first: private keys are not portable
+## Read this first: the seed is the portable private key
 
-**An identity created by another Activeledger SDK cannot be used here, and an
-identity created here cannot have its private key loaded elsewhere.**
+**A private key here is a 32-byte seed, not the 4032-byte encoding the other
+SDKs export.** `paragonie/pqcrypto_compat` implements FIPS 204 key generation
+from a seed, but not `skEncode`/`skDecode`, so the 4032-byte form cannot be
+loaded here and cannot be turned back into the seed it came from.
 
-The underlying library (`paragonie/pqcrypto_compat`) implements FIPS 204 key
-generation from a **32-byte seed**, but not private key encoding or decoding.
-The JavaScript, JVM, C#, Go and Rust SDKs all store the **4032-byte** private
-key. There is no conversion in that direction, because the 4032-byte form
-cannot be turned back into the seed it came from.
-
-What still works everywhere:
+That used to make an identity unmovable in either direction. It no longer
+does — **every Activeledger SDK can now import a seed** — but the direction
+matters:
 
 | | Works |
 |---|---|
@@ -30,8 +28,13 @@ What still works everywhere:
 | Onboard an identity created here | ✅ the ledger sees a normal `ml-dsa-65` identity |
 | Sign transactions | ✅ standard 3309-byte signatures, hedged |
 | Reuse an identity created here, in PHP | ✅ store `seedBase64()` |
-| Load a private key from another SDK | ❌ throws, by design |
-| Hand a PHP private key to another SDK | ❌ it is a seed, not a 4032-byte key |
+| Take a PHP identity to another SDK | ✅ give it the **seed**, via that SDK's `fromSeed` |
+| Recover the same identity in both from one phrase | ✅ see [Recovery phrases](#recovery-phrases) |
+| Load another SDK's **4032-byte** private key here | ❌ throws, by design |
+
+So share the seed, never the 4032-byte key. The same 32 bytes derive an
+identical 1952-byte public key in every SDK — verified against the JavaScript
+implementation byte for byte.
 
 Passing a 4032-byte key throws immediately with an explanation. That guard
 exists because the library underneath **does not** reject it: it accepts any
@@ -39,9 +42,56 @@ string as seed material, derives a completely unrelated identity, and signs
 happily. Those signatures are then rejected by the ledger as 1220 "Signature
 Incorrect" — a message that points nowhere near the cause.
 
-If you need one identity shared between PHP and another language, generate it
-in PHP and give the other SDK only the public key, or use one of the other
-SDKs for signing.
+## Seeds and recovery phrases
+
+### From a seed
+
+```php
+use Activeledger\KeyPair;
+use Activeledger\Secp256k1KeyPair;
+
+$pq = KeyPair::fromSeed($seed);                  // 32 bytes
+$ec = Secp256k1KeyPair::fromSeed($seed);         // 32 bytes
+```
+
+A seed of the wrong length is **refused, not padded** — a padded seed is a
+different identity, not a malformed one.
+
+For `secp256k1` the seed **is** the private scalar, so it has to be a valid
+one. A seed of zero, or one at or above the curve order, is refused rather
+than reduced mod *n*: reducing produces a perfectly functional key belonging
+to a different identity, and nothing downstream ever reports a problem.
+
+### Recovery phrases
+
+```php
+$pq = KeyPair::fromPhrase($phrase);                    // ml-dsa-65
+$ec = Secp256k1KeyPair::fromPhrase($phrase);           // secp256k1
+$withPassphrase = KeyPair::fromPhrase($phrase, "...");
+```
+
+One phrase backs both identity types at once, because each derives its own
+seed:
+
+| Type | Seed from the BIP-39 seed `S` |
+| --- | --- |
+| `ml-dsa-65` | `HKDF-SHA512(S, salt="", info="activeledger-seed-v1:ml-dsa-65", 32)` |
+| `falcon-512` | `HKDF-SHA512(S, salt="", info="activeledger-seed-v1:falcon-512", 48)` |
+| `secp256k1` | `HMAC-SHA512("Bitcoin seed", S)[0..32]` |
+
+`secp256k1` deliberately does not use HKDF: the JavaScript SDK shipped that
+derivation before the post-quantum types existed, so phrases are already in
+use, and changing it would hand those users a different key for a phrase that
+used to work. `Secp256k1KeyPair::fromLegacyPhrase()` recovers a phrase made
+by the older `@activeledger/sdk-bip39` package — for recovery only, never for
+new keys.
+
+**The phrase is validated**, wordlist and checksum both. A mistyped phrase
+that is not checked does not fail; it derives a perfectly valid key for an
+identity nobody owns, and the only symptom is the ledger not recognising it.
+
+`ext-intl` is optional and only affects non-ASCII passphrases, which BIP-39
+requires to be NFKD-normalised.
 
 ## Key types
 

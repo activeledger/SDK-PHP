@@ -74,6 +74,23 @@ final class KeyPair implements Signer
     }
 
     /**
+     * Derives a key pair from a BIP-39 recovery phrase.
+     *
+     * The phrase gives a 64-byte BIP-39 seed, which gives this scheme's own
+     * 32-byte seed through HKDF with an ml-dsa-65 specific info string. One
+     * phrase can therefore back an ml-dsa-65, a falcon-512 and a secp256k1
+     * identity at once without any of them revealing the others.
+     *
+     * @throws \InvalidArgumentException if the phrase is not a valid mnemonic
+     */
+    public static function fromPhrase(string $phrase, string $passphrase = ''): self
+    {
+        return self::fromSeed(
+            RecoveryPhrase::deriveSeed(KeyType::MlDsa65, RecoveryPhrase::toSeed($phrase, $passphrase))
+        );
+    }
+
+    /**
      * Restores a signing key pair from a base64 seed.
      *
      * @throws \InvalidArgumentException
