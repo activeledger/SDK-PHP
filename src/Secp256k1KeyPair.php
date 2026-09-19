@@ -98,6 +98,116 @@ final class Secp256k1KeyPair implements Signer
         );
     }
 
+    /**
+     * Derives a key pair from a 32-byte seed.
+     *
+     * For secp256k1 the seed IS the private scalar - there is no key
+     * derivation step - which is why it has to be a valid one. A scalar of
+     * zero, or one at or above the group order, is refused rather than
+     * reduced mod n: reducing produces a perfectly functional key belonging
+     * to a different identity, and nothing downstream ever reports a
+     * problem.
+     *
+     * The public point is derived by handing OpenSSL a SEC1 private key with
+     * the optional public field omitted, which it fills in. This PHP build
+     * has neither gmp nor bcmath, so there is no other route to a point
+     * multiplication here.
+     *
+     * @throws \InvalidArgumentException if the seed is not a usable scalar
+     */
+    public static function fromSeed(string $seed, bool $compressed = true): self
+    {
+        if (strlen($seed) !== self::PRIVATE_KEY_SIZE) {
+            throw new \InvalidArgumentException(sprintf(
+                'secp256k1 needs a %d-byte seed, got %d. It is refused rather than padded: '
+                . 'a padded seed is a different identity, not a malformed one.',
+                self::PRIVATE_KEY_SIZE,
+                strlen($seed)
+            ));
+        }
+
+        $order = hex2bin(self::ORDER_HEX);
+        if ($seed === str_repeat("\0", self::PRIVATE_KEY_SIZE) || self::compare($seed, $order) >= 0) {
+            throw new \InvalidArgumentException(
+                'seed is not a valid secp256k1 private key - the scalar must be in [1, n-1]'
+            );
+        }
+
+        $key = openssl_pkey_get_private(self::sec1PrivateKeyPem($seed));
+        if ($key === false) {
+            throw new \RuntimeException(
+                'OpenSSL refused a secp256k1 private key built from the seed: '
+                . (openssl_error_string() ?: 'no detail given')
+            );
+        }
+
+        $details = openssl_pkey_get_details($key);
+        if (!isset($details['ec']['x'], $details['ec']['y'])) {
+            throw new \RuntimeException(
+                'OpenSSL did not derive a public point from the seed - this build cannot '
+                . 'support fromSeed'
+            );
+        }
+
+        return new self(
+            self::encodePoint($details['ec']['x'], $details['ec']['y'], $compressed),
+            $seed
+        );
+    }
+
+    /**
+     * Derives a key pair from a BIP-39 recovery phrase.
+     *
+     * @throws \InvalidArgumentException if the phrase is not a valid mnemonic
+     */
+    public static function fromPhrase(
+        string $phrase,
+        string $passphrase = '',
+        bool $compressed = true
+    ): self {
+        return self::fromSeed(
+            RecoveryPhrase::deriveSeed(KeyType::Secp256k1, RecoveryPhrase::toSeed($phrase, $passphrase)),
+            $compressed
+        );
+    }
+
+    /**
+     * Recovers a key pair from a phrase made by @activeledger/sdk-bip39.
+     *
+     * That scheme is SHA256(phrase) used directly as the scalar - no key
+     * stretching, no domain separation, no passphrase. It exists here so an
+     * old phrase can be recovered, never so a new key can be made with it.
+     *
+     * @throws \InvalidArgumentException
+     */
+    public static function fromLegacyPhrase(string $phrase, bool $compressed = true): self
+    {
+        // Deliberately not validated as a mnemonic: the legacy scheme hashes
+        // the string as given and never consulted the wordlist, so rejecting
+        // a phrase here that the original package accepted would make a
+        // recoverable identity unrecoverable.
+        return self::fromSeed(hash('sha256', $phrase, true), $compressed);
+    }
+
+    /**
+     * A SEC1 ECPrivateKey PEM carrying only the scalar.
+     *
+     * The optional publicKey field is omitted on purpose - OpenSSL computes
+     * the point when loading, which is the only scalar-to-point route this
+     * extension exposes.
+     */
+    private static function sec1PrivateKeyPem(string $scalar): string
+    {
+        $der = "\x30\x2e"                              // SEQUENCE, 46 bytes
+            . "\x02\x01\x01"                          // version 1
+            . "\x04\x20" . $scalar                     // privateKey, 32 bytes
+            . "\xa0\x07\x06\x05\x2b\x81\x04\x00\x0a"; // [0] namedCurve secp256k1
+
+        return "-----BEGIN EC PRIVATE KEY-----\n"
+            . chunk_split(base64_encode($der), 64, "\n")
+            . "-----END EC PRIVATE KEY-----\n";
+    }
+
     /** A verify-only key pair from a stored public key. */
     public static function fromPublicKey(string $publicKey): self
     {
