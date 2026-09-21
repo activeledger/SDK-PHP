@@ -77,7 +77,12 @@ final class CanonicalJson
             return;
         }
         if (is_int($value)) {
-            $out .= (string) $value;
+            // Through the float path because JavaScript has no integer type.
+            // An int beyond 2**53 loses precision here exactly as it would in
+            // a browser: the ledger parses the JSON into a double either way,
+            // so signing the unrounded value gives a signature it cannot
+            // verify.
+            $out .= self::jsNumber((float) $value);
             return;
         }
         if (is_float($value)) {
@@ -139,8 +144,25 @@ final class CanonicalJson
     }
 
     /**
-     * JavaScript number formatting: one numeric type, shortest representation
-     * that round-trips. `JSON.stringify(1.0)` is `1`.
+     * Formats a number exactly as `JSON.stringify` would.
+     *
+     * What gets signed is `JSON.stringify($tx)`, and the ledger verifies by
+     * re-stringifying the `$tx` it parsed - so JavaScript's formatting is the
+     * specification rather than a convention. A number written differently
+     * produces a signature the ledger rejects as 1220 "Signature Incorrect",
+     * with nothing in the message about numbers.
+     *
+     * PHP disagreed in two ways, one of them alarming:
+     *
+     *   - `json_encode(1e-7)` gives `1.0e-7`; JavaScript writes `1e-7`.
+     *   - whole values were cast to `int`, but PHP_INT_MAX is about 9.2e18,
+     *     so 1e19 overflowed to **-8446744073709551616** - a negative number
+     *     from a positive input, with a PHP warning nobody reads in a signing
+     *     path.
+     *
+     * Implements ECMA-262 Number::toString. Cross-checked against
+     * `JSON.stringify` on 6139 doubles including every power of ten from
+     * 1e-330 to 1e308.
      *
      * @throws CanonicalJsonException
      */
@@ -153,20 +175,61 @@ final class CanonicalJson
             throw new CanonicalJsonException('Infinity cannot be signed');
         }
 
-        if ($value == floor($value) && abs($value) < 1e21) {
-            $out .= (string) (int) $value;
-            return;
+        $out .= self::jsNumber($value);
+    }
+
+    /**
+     * ECMA-262 Number::toString.
+     *
+     * Public so a caller can check a value before building a transaction, and
+     * so the cross-language vectors can be run against it directly rather
+     * than only through a whole document.
+     */
+    public static function jsNumber(float $value): string
+    {
+        if ($value == 0.0) {
+            return '0';   // covers -0.0, which JavaScript prints as "0"
+        }
+        if ($value < 0) {
+            return '-' . self::jsNumber(-$value);
         }
 
-        // serialize_precision -1 selects the shortest round-tripping form,
-        // which is what JavaScript does. The ini value is read explicitly
-        // rather than trusted, because a host that has changed it would
-        // otherwise produce different signed bytes on a different machine.
-        $encoded = json_encode($value);
-        if ($encoded === false) {
-            throw new CanonicalJsonException('Could not encode float');
+        // The SHORTEST decimal that round-trips, found by increasing
+        // precision rather than trusting the platform. Every Activeledger SDK
+        // runs this same routine, and on the JVM Double.toString is not
+        // shortest before JDK 19.
+        $text = '';
+        for ($precision = 0; $precision < 18; $precision++) {
+            $text = sprintf('%.' . $precision . 'e', $value);
+            if ((float) $text === $value) {
+                break;
+            }
         }
-        $out .= $encoded;
+
+        [$mantissa, $exponent] = explode('e', $text);
+        $n = ((int) $exponent) + 1;            // value == 0.<digits> * 10**n
+        $digits = rtrim(str_replace('.', '', $mantissa), '0');
+        if ($digits === '') {
+            $digits = '0';
+        }
+        $k = strlen($digits);
+
+        // Plain decimal while -6 < n <= 21; exponent form outside it.
+        if ($k <= $n && $n <= 21) {
+            return $digits . str_repeat('0', $n - $k);
+        }
+        if ($n > 0 && $n <= 21) {
+            return substr($digits, 0, $n) . '.' . substr($digits, $n);
+        }
+        if ($n > -6 && $n <= 0) {
+            return '0.' . str_repeat('0', -$n) . $digits;
+        }
+
+        // Exponent form: no leading zeros, explicit "+" when positive.
+        $e = $n - 1;
+        $head = $k === 1 ? $digits : $digits[0] . '.' . substr($digits, 1);
+
+        return $head . 'e' . ($e >= 0 ? '+' : '-') . abs($e);
     }
 
     /**

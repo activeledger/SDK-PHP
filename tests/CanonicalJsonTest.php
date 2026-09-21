@@ -205,11 +205,32 @@ final class CanonicalJsonTest extends TestCase
         self::assertSame(10, strlen(CanonicalJson::bytes($value)));
     }
 
-    public function testLargeIntegersKeepTheirPrecision(): void
+    /**
+     * Large integers take DOUBLE precision, which reverses what this test
+     * used to assert.
+     *
+     * Keeping PHP's exact integer looked like the careful choice, but the
+     * ledger verifies a re-stringified $tx: `keypair.ts` does
+     * `JSON.stringify(data)` on the object its HTTP layer already parsed. So
+     * 9007199254740993 on the wire becomes the double 9007199254740992 before
+     * anything is verified, and a signature over the exact integer cannot
+     * match. Preserving the precision produced a document the ledger rejects
+     * as 1220 "Signature Incorrect".
+     *
+     * JavaScript has no integer type; this is the same value a browser would
+     * have sent.
+     */
+    public function testLargeIntegersTakeDoublePrecisionLikeJavaScript(): void
     {
         self::assertSame(
-            '{"big":9007199254740993}',
+            '{"big":9007199254740992}',
             CanonicalJson::encode(['big' => 9007199254740993])
+        );
+
+        // Below 2**53 nothing is lost.
+        self::assertSame(
+            '{"big":9007199254740991}',
+            CanonicalJson::encode(['big' => 9007199254740991])
         );
     }
 
