@@ -183,7 +183,7 @@ Until Packagist is re-crawled, install from the repository:
   "repositories": [
     { "type": "vcs", "url": "https://github.com/activeledger/SDK-PHP" }
   ],
-  "require": { "activeledger/sdk": "^2.2" }
+  "require": { "activeledger/sdk": "^2.3" }
 }
 ```
 
