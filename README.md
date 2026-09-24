@@ -163,36 +163,12 @@ modular arithmetic and point multiplication, which is a far worse trade.
 
 ## Install
 
-> [!WARNING]
-> **`composer require activeledger/sdk` does not work.** Packagist still serves
-> `0.0.1`, last crawled in **November 2018** — the auto-update hook has been
-> dead since. The error it produces is actively misleading:
->
-> ```
-> activeledger/sdk 0.0.1 requires php ~5.6|~7.0
->   -> your php version (8.5.4) does not satisfy that requirement.
-> ```
->
-> That is a true statement about a package you never meant to install, and it
-> sends you to check your runtime rather than the package source.
-
-Until Packagist is re-crawled, install from the repository:
-
-```json
-{
-  "repositories": [
-    { "type": "vcs", "url": "https://github.com/activeledger/SDK-PHP" }
-  ],
-  "require": { "activeledger/sdk": "^2.3" }
-}
-```
-
 ```bash
-composer install
+composer require activeledger/sdk
 ```
 
-Verified: resolves `activeledger/sdk (v2.2.0)` with `paragonie/pqcrypto_compat`
-and `paragonie/sodium_compat`, on PHP 8.5.
+Verified: resolves `activeledger/sdk (v2.3.0)` from Packagist with
+`paragonie/pqcrypto_compat` and `paragonie/sodium_compat`, on PHP 8.5.
 
 
 ## Quick start
