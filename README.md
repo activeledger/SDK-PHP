@@ -3,6 +3,10 @@
   <img src="https://raw.githubusercontent.com/activeledger/activeledger/master/docs/assets/Asset-23.png" alt="Activeledger" width="300"/>
 </picture>
 
+[![Packagist](https://img.shields.io/packagist/v/activeledger/sdk)](https://packagist.org/packages/activeledger/sdk)
+[![PHP](https://img.shields.io/packagist/dependency-v/activeledger/sdk/php)](https://packagist.org/packages/activeledger/sdk)
+[![licence](https://img.shields.io/badge/licence-MIT-blue)](https://github.com/activeledger/SDK-PHP/blob/master/LICENSE)
+
 # Activeledger - PHP SDK
 
 Build, sign and submit Activeledger transactions from PHP, with post-quantum
