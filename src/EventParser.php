@@ -12,6 +12,12 @@ namespace Activeledger;
  * heartbeat and must not surface as an empty event, `event:` and `id:` belong
  * to one event and must not leak into the next, and exactly one space after
  * the colon is framing while every other byte is payload.
+ *
+ * @deprecated ActiveCore is deprecated and no longer serves events. A node
+ *             serves contract events from its own storage service, which must
+ *             never be reachable beyond the node's host, so a client has
+ *             nothing it should connect to. Run your own server-sent events
+ *             listener on the node's host. Removed in the next major version.
  */
 final class EventParser
 {

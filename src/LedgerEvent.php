@@ -4,7 +4,15 @@ declare(strict_types=1);
 
 namespace Activeledger;
 
-/** One server-sent event. */
+/**
+ * One server-sent event.
+ *
+ * @deprecated ActiveCore is deprecated and no longer serves events. A node
+ *             serves contract events from its own storage service, which must
+ *             never be reachable beyond the node's host, so a client has
+ *             nothing it should connect to. Run your own server-sent events
+ *             listener on the node's host. Removed in the next major version.
+ */
 final class LedgerEvent
 {
     public function __construct(

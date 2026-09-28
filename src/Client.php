@@ -14,7 +14,8 @@ final class Client
 
     /**
      * @param string $baseUrl The node's transaction URL, e.g. http://localhost:5260
-     * @param string|null $coreUrl The Activecore URL, which serves the event
+     * @param string|null $coreUrl Deprecated, with the subscribe methods it
+     *        serves. The Activecore URL, which serves the event
      *        streams. Activecore is a SEPARATE service on its own port, not a
      *        path on the node: a node answers 403 for every event route, so
      *        defaulting this to $baseUrl would turn a missing Activecore into
@@ -114,6 +115,11 @@ final class Client
      *
      * @param callable(LedgerEvent): (bool|null) $onEvent Return false to stop.
      * @throws \LogicException when no Activecore URL was configured
+     * @deprecated ActiveCore is deprecated and no longer serves events. A node
+     *             serves contract events from its own storage service, which must
+     *             never be reachable beyond the node's host, so a client has
+     *             nothing it should connect to. Run your own server-sent events
+     *             listener on the node's host. Removed in the next major version.
      */
     public function subscribeToActivity(callable $onEvent, ?string $streamId = null): void
     {
@@ -130,6 +136,11 @@ final class Client
      *
      * @param callable(LedgerEvent): (bool|null) $onEvent Return false to stop.
      * @throws \LogicException
+     * @deprecated ActiveCore is deprecated and no longer serves events. A node
+     *             serves contract events from its own storage service, which must
+     *             never be reachable beyond the node's host, so a client has
+     *             nothing it should connect to. Run your own server-sent events
+     *             listener on the node's host. Removed in the next major version.
      */
     public function subscribeToContractEvents(
         callable $onEvent,
@@ -159,6 +170,11 @@ final class Client
      *
      * @param callable(LedgerEvent): (bool|null) $onEvent Return false to stop.
      * @throws \RuntimeException
+     * @deprecated ActiveCore is deprecated and no longer serves events. A node
+     *             serves contract events from its own storage service, which must
+     *             never be reachable beyond the node's host, so a client has
+     *             nothing it should connect to. Run your own server-sent events
+     *             listener on the node's host. Removed in the next major version.
      */
     public function subscribe(string $pathOrUrl, callable $onEvent, ?int $timeoutSeconds = null): void
     {
