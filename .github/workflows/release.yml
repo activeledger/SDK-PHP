@@ -1,0 +1,80 @@
+# Cuts a release: test -> tag -> push -> GitHub release -> verify.
+#
+# There is no publish step and that is correct: Packagist watches the
+# repository and picks up a tag by webhook, so the tag IS the publish. There is
+# no version in composer.json either - Packagist reads it from the tag, and a
+# hardcoded one would only ever disagree.
+#
+# The verification is not decoration. Packagist's auto-update hook was dead
+# here from 2018 until 2026, so `composer require activeledger/sdk` served
+# 0.0.1 for eight years and failed with a PHP VERSION error - a true statement
+# about a package nobody meant to install. Silence is not evidence that the
+# hook fired.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, without the leading v (e.g. 2.4.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+
+      - name: Install
+        run: composer install --no-interaction --no-progress
+
+      - name: Test
+        run: ./vendor/bin/phpunit
+
+      - name: Tag and push
+        run: |
+          set -eu
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ inputs.version }}" -m "v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v${{ inputs.version }}" --title "v${{ inputs.version }}" --generate-notes
+
+  verify:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+
+      - name: Require it from Packagist and use it
+        run: |
+          set -eu
+          v="${{ needs.release.outputs.version }}"
+          mkdir consumer && cd consumer
+          # Retry: Packagist updates from the webhook, which is not instant -
+          # and historically did not fire at all.
+          for i in $(seq 1 12); do
+            composer require "activeledger/sdk:$v" --no-interaction --no-progress && break
+            echo "not on Packagist yet (attempt $i)"; sleep 20
+          done
+          php -r '
+            require "vendor/autoload.php";
+            // The number formatting is the thing a bad release loses quietly.
+            if (Activeledger\CanonicalJson::jsNumber(1e-7) !== "1e-7") { exit(1); }
+            if (Activeledger\CanonicalJson::jsNumber(1e21) !== "1e+21") { exit(1); }
+            echo "registry install verified\n";
+          '
