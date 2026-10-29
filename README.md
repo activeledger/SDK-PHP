@@ -174,7 +174,7 @@ modular arithmetic and point multiplication, which is a far worse trade.
 composer require activeledger/sdk
 ```
 
-Verified: resolves `activeledger/sdk (v2.3.0)` from Packagist with
+Verified: resolves `activeledger/sdk (v2.4.0)` from Packagist with
 `paragonie/pqcrypto_compat` and `paragonie/sodium_compat`, on PHP 8.5.
 
 
@@ -208,7 +208,7 @@ $tx = Transaction::builder()
 $response = $client->submit($tx);
 
 if (!$response->committed()) {
-    // NOT the HTTP status. See "A rejected transaction is an HTTP 200" below.
+    // NOT the HTTP status: the ledger answers 200 for a rejected transaction.
     print_r($response->errors());
 }
 ```
@@ -224,7 +224,7 @@ $key = KeyPair::fromSeedBase64(file_get_contents('identity.seed'));
 ```php
 $key = KeyPair::generate();
 
-$key->publicKeyBase64();   // 1952 bytes, exactly as the ledger stores it
+$key->publicKey();   // 1952 bytes, exactly as the ledger stores it
 $key->seedBase64();        // 32 bytes - store this
 $key->canSign();           // true
 
