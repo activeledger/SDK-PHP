@@ -9,10 +9,14 @@ final class LedgerResponse
 {
     private readonly ?array $parsed;
 
-    public function __construct(private readonly string $raw)
+    /**
+     * @param int|null $httpStatus The HTTP status the body arrived with, when
+     *        known. A status outside 2xx is never a commit.
+     */
+    public function __construct(private readonly string $raw, private readonly ?int $httpStatus = null)
     {
-        $decoded = json_decode($raw, true);
-        $this->parsed = is_array($decoded) ? $decoded : null;
+        // Only a JSON object is a ledger reply; a list or scalar is not.
+        $this->parsed = json_decode($raw) instanceof \stdClass ? json_decode($raw, true) : null;
     }
 
     /** The response body exactly as the node sent it. */
@@ -22,7 +26,8 @@ final class LedgerResponse
     }
 
     /**
-     * Errors the network reported.
+     * Errors the network reported, or that this SDK found in the reply: a body
+     * that is not a JSON object, or an HTTP status outside 2xx.
      *
      * Non-empty means the transaction did NOT commit, even though the HTTP
      * status was 200. The ledger answers 200 for a rejected transaction, so
@@ -34,17 +39,27 @@ final class LedgerResponse
     public function errors(): array
     {
         $errors = $this->parsed['$summary']['errors'] ?? null;
-        if (!is_array($errors)) {
-            return [];
-        }
-
-        return array_values(array_map(
+        $errors = is_array($errors) ? array_values(array_map(
             static fn($e) => is_string($e) ? $e : (json_encode($e) ?: ''),
             $errors
-        ));
+        )) : [];
+
+        if ($errors === []) {
+            if ($this->parsed === null) {
+                $errors[] = 'Response body is not a JSON object';
+            }
+            if ($this->httpStatus !== null && ($this->httpStatus < 200 || $this->httpStatus > 299)) {
+                $errors[] = "HTTP status {$this->httpStatus}";
+            }
+        }
+
+        return $errors;
     }
 
-    /** True when errors() is empty. This, not the HTTP status. */
+    /**
+     * True when errors() is empty: a JSON object reply, a 2xx status and no
+     * reported errors. The ledger's own verdict, not the HTTP status alone.
+     */
     public function committed(): bool
     {
         return $this->errors() === [];

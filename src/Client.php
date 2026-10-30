@@ -71,6 +71,7 @@ final class Client
 
         $raw = curl_exec($handle);
         $error = curl_error($handle);
+        $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
         // No curl_close(): the handle is an object freed by refcount, the
         // function has had no effect since PHP 8.0, and calling it is
         // deprecated from 8.5.
@@ -80,7 +81,7 @@ final class Client
             throw new \RuntimeException("Request to {$this->baseUrl} failed: $error");
         }
 
-        return new LedgerResponse((string) $raw);
+        return new LedgerResponse((string) $raw, $status);
     }
 
     /**
@@ -97,7 +98,7 @@ final class Client
         $response = $this->submit(Transaction::onboard($signer));
 
         $streams = $response->newStreams();
-        if ($streams === []) {
+        if (!$response->committed() || $streams === []) {
             throw new \RuntimeException('Onboard failed: ' . $response->raw());
         }
 

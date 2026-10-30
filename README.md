@@ -208,7 +208,9 @@ $tx = Transaction::builder()
 $response = $client->submit($tx);
 
 if (!$response->committed()) {
-    // NOT the HTTP status: the ledger answers 200 for a rejected transaction.
+    // NOT the HTTP status alone: the ledger answers 200 for a rejected
+    // transaction. A non-2xx status or a body that is not a JSON object is
+    // reported here as an error too.
     print_r($response->errors());
 }
 ```
