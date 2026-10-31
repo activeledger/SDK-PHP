@@ -119,9 +119,9 @@ final class LedgerResponseTest extends TestCase
         self::assertSame([], $r->responses());
     }
 
-    public function testAnEmptyObjectIsStillCommitted(): void
+    public function testAnEmptySummaryObjectIsCommitted(): void
     {
-        self::assertTrue((new LedgerResponse('{}', 200))->committed());
+        self::assertTrue((new LedgerResponse('{"$summary":{}}', 200))->committed());
     }
 
     /**
@@ -135,7 +135,7 @@ final class LedgerResponseTest extends TestCase
     #[DataProvider('failureStatuses')]
     public function testANon2xxStatusIsNotCommittedEvenWithAnEmptyObject(int $status): void
     {
-        $r = new LedgerResponse('{}', $status);
+        $r = new LedgerResponse('{"$summary":{}}', $status);
 
         self::assertFalse($r->committed());
         self::assertSame(["HTTP status $status"], $r->errors());
@@ -150,7 +150,27 @@ final class LedgerResponseTest extends TestCase
 
     public function test2xxStatusesAreAccepted(): void
     {
-        self::assertTrue((new LedgerResponse('{}', 200))->committed());
-        self::assertTrue((new LedgerResponse('{}', 204))->committed());
+        self::assertTrue((new LedgerResponse('{"$summary":{}}', 200))->committed());
+        self::assertTrue((new LedgerResponse('{"$summary":{}}', 204))->committed());
+    }
+
+    public static function summarylessBodies(): array
+    {
+        return [
+            'empty object' => ['{}'],
+            'other keys only' => ['{"$streams":{"new":[{"id":"a"}]}}'],
+            'summary is a list' => ['{"$summary":[]}'],
+            'summary is a string' => ['{"$summary":"ok"}'],
+            'summary is null' => ['{"$summary":null}'],
+        ];
+    }
+
+    #[DataProvider('summarylessBodies')]
+    public function testABodyWithoutASummaryObjectIsNotCommitted(string $body): void
+    {
+        $r = new LedgerResponse($body, 200);
+
+        self::assertFalse($r->committed());
+        self::assertSame(['Response has no $summary object'], $r->errors());
     }
 }

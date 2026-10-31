@@ -8,6 +8,7 @@ namespace Activeledger;
 final class LedgerResponse
 {
     private readonly ?array $parsed;
+    private readonly bool $hasSummary;
 
     /**
      * @param int|null $httpStatus The HTTP status the body arrived with, when
@@ -16,7 +17,12 @@ final class LedgerResponse
     public function __construct(private readonly string $raw, private readonly ?int $httpStatus = null)
     {
         // Only a JSON object is a ledger reply; a list or scalar is not.
-        $this->parsed = json_decode($raw) instanceof \stdClass ? json_decode($raw, true) : null;
+        $object = json_decode($raw);
+        $this->parsed = $object instanceof \stdClass ? json_decode($raw, true) : null;
+        // Every node reply carries a `$summary` object, so one without it is
+        // not a ledger reply.
+        $this->hasSummary = $object instanceof \stdClass
+            && ($object->{'$summary'} ?? null) instanceof \stdClass;
     }
 
     /** The response body exactly as the node sent it. */
@@ -27,7 +33,8 @@ final class LedgerResponse
 
     /**
      * Errors the network reported, or that this SDK found in the reply: a body
-     * that is not a JSON object, or an HTTP status outside 2xx.
+     * that is not a JSON object, one without a `$summary` object, or an HTTP
+     * status outside 2xx.
      *
      * Non-empty means the transaction did NOT commit, even though the HTTP
      * status was 200. The ledger answers 200 for a rejected transaction, so
@@ -47,6 +54,8 @@ final class LedgerResponse
         if ($errors === []) {
             if ($this->parsed === null) {
                 $errors[] = 'Response body is not a JSON object';
+            } elseif (!$this->hasSummary) {
+                $errors[] = 'Response has no $summary object';
             }
             if ($this->httpStatus !== null && ($this->httpStatus < 200 || $this->httpStatus > 299)) {
                 $errors[] = "HTTP status {$this->httpStatus}";
@@ -57,8 +66,8 @@ final class LedgerResponse
     }
 
     /**
-     * True when errors() is empty: a JSON object reply, a 2xx status and no
-     * reported errors. The ledger's own verdict, not the HTTP status alone.
+     * True when errors() is empty: a JSON object reply with a `$summary`
+     * object, a 2xx status and no reported errors. The ledger's own verdict, not the HTTP status alone.
      */
     public function committed(): bool
     {
