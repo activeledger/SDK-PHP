@@ -6,6 +6,7 @@ namespace Activeledger\Tests;
 
 use Activeledger\CanonicalJson;
 use Activeledger\CanonicalJsonException;
+use Activeledger\KeyType;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -238,5 +239,50 @@ final class CanonicalJsonTest extends TestCase
     {
         $this->expectException(CanonicalJsonException::class);
         CanonicalJson::encode(['x' => new \stdClass()]);
+    }
+
+    public function testAnArrayThatIsNotAListIsAnObjectWithStringKeys(): void
+    {
+        self::assertSame('{"1":"a","2":"b"}', CanonicalJson::encode([1 => 'a', 2 => 'b']));
+        self::assertSame('{"-1":"a"}', CanonicalJson::encode([-1 => 'a']));
+        self::assertSame('{"":1}', CanonicalJson::encode(['' => 1]));
+    }
+
+    public function testEmptyAndNestedEmptyContainersKeepTheirKind(): void
+    {
+        self::assertSame(
+            '{"a":[[],{"1":2},{"x":[]},{}]}',
+            CanonicalJson::encode(['a' => [[], [1 => 2], ['x' => []], CanonicalJson::object()]])
+        );
+    }
+
+    public function testDeleteAndLineSeparatorsAreNotEscaped(): void
+    {
+        // JSON.stringify leaves both raw; only the characters below 0x20 are
+        // escaped.
+        self::assertSame("\"\x7f\"", CanonicalJson::encode("\x7f"));
+        self::assertSame("\"\u{2028}\"", CanonicalJson::encode("\u{2028}"));
+    }
+
+    public function testEnumsAndClosuresAreRefusedLikeAnyOtherObject(): void
+    {
+        foreach ([KeyType::Rsa, static fn() => 1] as $value) {
+            try {
+                CanonicalJson::encode(['x' => $value]);
+                self::fail(get_debug_type($value) . ' was serialised');
+            } catch (CanonicalJsonException $e) {
+                self::assertStringContainsString(get_debug_type($value), $e->getMessage());
+            }
+        }
+    }
+
+    public function testDeeplyNestedInputIsNotCutOffByPhpsJsonDepthLimit(): void
+    {
+        $value = 1;
+        for ($i = 0; $i < 2000; $i++) {
+            $value = [$value];
+        }
+
+        self::assertSame(str_repeat('[', 2000) . '1' . str_repeat(']', 2000), CanonicalJson::encode($value));
     }
 }

@@ -412,4 +412,76 @@ final class Secp256k1Test extends TestCase
     {
         self::assertSame(KeyType::Secp256k1, Secp256k1KeyPair::generate()->keyType());
     }
+
+    public function testFromKeysRejectsAPrivateKeyOfTheWrongLength(): void
+    {
+        $key = Secp256k1KeyPair::generate();
+
+        foreach ([31, 33] as $length) {
+            try {
+                Secp256k1KeyPair::fromKeys($key->publicKey(), '0x' . str_repeat('11', $length));
+                self::fail("a $length byte private key was accepted");
+            } catch (\InvalidArgumentException $e) {
+                self::assertStringContainsString("$length bytes, expected 32", $e->getMessage());
+            }
+        }
+    }
+
+    public function testFromKeysRejectsAPrivateKeyThatIsNotHex(): void
+    {
+        $key = Secp256k1KeyPair::generate();
+
+        foreach (['0xzz', '0x123', '0x', '0x' . str_repeat('1g', 32)] as $private) {
+            try {
+                Secp256k1KeyPair::fromKeys($key->publicKey(), $private);
+                self::fail("'$private' was accepted as a private key");
+            } catch (\InvalidArgumentException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
+    public function testFromKeysRejectsAZeroPrivateKey(): void
+    {
+        $key = Secp256k1KeyPair::generate();
+
+        $this->expectException(\InvalidArgumentException::class);
+        Secp256k1KeyPair::fromKeys($key->publicKey(), '0x' . str_repeat('00', 32));
+    }
+
+    public function testAnEmptyHexBodyIsRejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        Secp256k1KeyPair::fromPublicKey('0x');
+    }
+
+    public function testHexDigitsAreAcceptedInEitherCaseButTheStoredFormIsLowercase(): void
+    {
+        $key = Secp256k1KeyPair::generate();
+        $upper = '0x' . strtoupper(substr($key->publicKey(), 2));
+
+        self::assertSame($key->publicKey(), Secp256k1KeyPair::fromPublicKey($upper)->publicKey());
+    }
+
+    public function testAnUppercasePrefixIsNotThe0xTheLedgerStores(): void
+    {
+        $key = Secp256k1KeyPair::generate();
+
+        $this->expectException(\InvalidArgumentException::class);
+        Secp256k1KeyPair::fromPublicKey('0X' . substr($key->publicKey(), 2));
+    }
+
+    public function testAnEmptySignatureDoesNotVerifyAndDoesNotThrow(): void
+    {
+        self::assertFalse(Secp256k1KeyPair::generate()->verify('message', ''));
+    }
+
+    public function testEmptyAndBinaryMessagesSignAndVerify(): void
+    {
+        $key = Secp256k1KeyPair::generate();
+
+        foreach (['', "caf\u{e9}\0tail", "\xff\xfe\x00"] as $message) {
+            self::assertTrue($key->verify($message, $key->sign($message)));
+        }
+    }
 }

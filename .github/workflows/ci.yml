@@ -33,3 +33,12 @@ jobs:
       # here rather than merely uninformative.
       - name: Test
         run: vendor/bin/phpunit --testsuite unit
+
+      # Every PHP file must parse on the oldest supported version; a syntax
+      # error in a branch the tests never reach would otherwise ship.
+      - name: Lint
+        run: find src tests -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+
+      # The package installed the way a consumer would receive it, offline.
+      - name: Smoke test
+        run: tests/smoke/run.sh

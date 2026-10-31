@@ -163,4 +163,21 @@ final class KeyPairEdgeCasesTest extends TestCase
         $this->expectExceptionMessage('public is not valid base64');
         KeyPair::fromPublicKeyBase64($urlSafe);
     }
+
+    public function testEmptyAndBinaryMessagesSignAndVerify(): void
+    {
+        $key = KeyPair::generate();
+
+        foreach (['', "caf\u{e9}\0tail", "\xff\xfe\x00"] as $message) {
+            self::assertTrue($key->verify($message, $key->sign($message)));
+        }
+    }
+
+    public function testASignatureDoesNotVerifyAnotherMessage(): void
+    {
+        $key = KeyPair::generate();
+
+        self::assertFalse($key->verify('b', $key->sign('a')));
+        self::assertFalse($key->verify('a', ''));
+    }
 }

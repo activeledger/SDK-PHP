@@ -9,6 +9,7 @@ use Activeledger\Identity;
 use Activeledger\JsonObject;
 use Activeledger\KeyPair;
 use Activeledger\KeyType;
+use Activeledger\LedgerEvent;
 use PHPUnit\Framework\TestCase;
 
 /** JsonObject's accessors, plus the small value types around keys. */
@@ -81,5 +82,12 @@ final class ValueTypesTest extends TestCase
         self::assertSame('stream-1', $identity->streamId);
         self::assertSame($key, $identity->signer);
         self::assertSame($key->publicKey(), $identity->publicKey());
+    }
+
+    public function testAnEventPayloadThatIsAJsonScalarDecodesToIt(): void
+    {
+        self::assertSame('x', (new LedgerEvent(null, '"x"', '', null))->json());
+        self::assertSame(7, (new LedgerEvent(null, '7', '', null))->json());
+        self::assertNull((new LedgerEvent(null, '{broken', '', null))->json());
     }
 }
