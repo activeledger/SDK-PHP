@@ -59,6 +59,10 @@ final class Secp256k1KeyPair implements Signer
     /** secp256k1's group order, big-endian. */
     private const ORDER_HEX = 'fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141';
 
+    /** Parsed once on first use: parsing the PEM costs as much as signing. */
+    private ?\OpenSSLAsymmetricKey $signingKey = null;
+    private ?\OpenSSLAsymmetricKey $verifyingKey = null;
+
     private function __construct(
         private readonly string $publicRaw,
         private readonly ?string $privateRaw,
@@ -305,11 +309,15 @@ final class Secp256k1KeyPair implements Signer
             );
         }
 
-        $key = openssl_pkey_get_private($this->privatePem());
-        if ($key === false) {
-            throw new \RuntimeException(
-                'OpenSSL rejected the private key: ' . (openssl_error_string() ?: 'no detail')
-            );
+        $key = $this->signingKey;
+        if ($key === null) {
+            $parsed = openssl_pkey_get_private($this->privatePem());
+            if ($parsed === false) {
+                throw new \RuntimeException(
+                    'OpenSSL rejected the private key: ' . (openssl_error_string() ?: 'no detail')
+                );
+            }
+            $key = $this->signingKey = $parsed;
         }
 
         $signature = '';
@@ -336,9 +344,13 @@ final class Secp256k1KeyPair implements Signer
      */
     public function verify(string $message, string $signature): bool
     {
-        $key = openssl_pkey_get_public($this->publicPem());
-        if ($key === false) {
-            return false;
+        $key = $this->verifyingKey;
+        if ($key === null) {
+            $parsed = openssl_pkey_get_public($this->publicPem());
+            if ($parsed === false) {
+                return false;
+            }
+            $key = $this->verifyingKey = $parsed;
         }
 
         // openssl_verify returns 1, 0 or -1; only 1 means valid. It also emits

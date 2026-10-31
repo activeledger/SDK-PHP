@@ -46,6 +46,9 @@ final class KeyPair implements Signer
      */
     public const FOREIGN_PRIVATE_KEY_SIZE = 4032;
 
+    /** Serialising the key costs about a millisecond, so it is done once. */
+    private ?string $publicKeyBase64 = null;
+
     private function __construct(
         private readonly ?SigningKey $signingKey,
         private readonly VerificationKey $verificationKey,
@@ -128,7 +131,7 @@ final class KeyPair implements Signer
     /** The public key, base64, exactly as the ledger stores it. */
     public function publicKey(): string
     {
-        return base64_encode($this->verificationKey->bytes());
+        return $this->publicKeyBase64 ??= base64_encode($this->verificationKey->bytes());
     }
 
     /**

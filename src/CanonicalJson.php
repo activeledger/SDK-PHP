@@ -24,6 +24,19 @@ namespace Activeledger;
  */
 final class CanonicalJson
 {
+    /** What JSON.stringify escapes in a string; everything else is literal. */
+    private const ESCAPES = [
+        '"' => '\\"', '\\' => '\\\\', "\n" => '\\n', "\r" => '\\r', "\t" => '\\t',
+        "\x08" => '\\b', "\x0C" => '\\f',
+        "\x00" => '\\u0000', "\x01" => '\\u0001', "\x02" => '\\u0002', "\x03" => '\\u0003',
+        "\x04" => '\\u0004', "\x05" => '\\u0005', "\x06" => '\\u0006', "\x07" => '\\u0007',
+        "\x0B" => '\\u000b', "\x0E" => '\\u000e', "\x0F" => '\\u000f',
+        "\x10" => '\\u0010', "\x11" => '\\u0011', "\x12" => '\\u0012', "\x13" => '\\u0013',
+        "\x14" => '\\u0014', "\x15" => '\\u0015', "\x16" => '\\u0016', "\x17" => '\\u0017',
+        "\x18" => '\\u0018', "\x19" => '\\u0019', "\x1A" => '\\u001a', "\x1B" => '\\u001b',
+        "\x1C" => '\\u001c', "\x1D" => '\\u001d', "\x1E" => '\\u001e', "\x1F" => '\\u001f',
+    ];
+
     /**
      * Serialises to the exact string the ledger expects.
      *
@@ -82,7 +95,13 @@ final class CanonicalJson
             // a browser: the ledger parses the JSON into a double either way,
             // so signing the unrounded value gives a signature it cannot
             // verify.
-            $out .= self::jsNumber((float) $value);
+            //
+            // Within 2**53 every integer is exact as a double and JavaScript
+            // prints it as plain digits, so skip the shortest-round-trip
+            // search that jsNumber() needs for fractions.
+            $out .= $value > -9007199254740992 && $value < 9007199254740992
+                ? (string) $value
+                : self::jsNumber((float) $value);
             return;
         }
         if (is_float($value)) {
@@ -239,44 +258,13 @@ final class CanonicalJson
      */
     private static function writeString(string &$out, string $value): void
     {
-        $out .= '"';
-
-        $length = strlen($value);
-        for ($i = 0; $i < $length; $i++) {
-            $c = $value[$i];
-            switch ($c) {
-                case '"':
-                    $out .= '\\"';
-                    break;
-                case '\\':
-                    $out .= '\\\\';
-                    break;
-                case "\n":
-                    $out .= '\\n';
-                    break;
-                case "\r":
-                    $out .= '\\r';
-                    break;
-                case "\t":
-                    $out .= '\\t';
-                    break;
-                case "\x08":
-                    $out .= '\\b';
-                    break;
-                case "\x0C":
-                    $out .= '\\f';
-                    break;
-                default:
-                    if ($c < "\x20") {
-                        $out .= sprintf('\\u%04x', ord($c));
-                    } else {
-                        // Byte-wise, so multi-byte UTF-8 sequences pass
-                        // through untouched.
-                        $out .= $c;
-                    }
-            }
+        // Most strings need no escaping at all, so check for that in one
+        // native scan rather than visiting every byte from PHP.
+        if (preg_match('/[\x00-\x1f"\\\\]/', $value) === 1) {
+            $value = strtr($value, self::ESCAPES);
         }
 
-        $out .= '"';
+        // Byte-wise, so multi-byte UTF-8 sequences pass through untouched.
+        $out .= '"' . $value . '"';
     }
 }
