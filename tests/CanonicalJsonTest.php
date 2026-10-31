@@ -285,4 +285,59 @@ final class CanonicalJsonTest extends TestCase
 
         self::assertSame(str_repeat('[', 2000) . '1' . str_repeat(']', 2000), CanonicalJson::encode($value));
     }
+
+    public function testValidMultibyteUtf8StillPassesThrough(): void
+    {
+        $text = "\u{20ac} \u{1f600} \u{10ffff} \u{d7ff} \u{e000}";
+
+        self::assertSame(
+            "{\"k\u{e9}\":\"" . $text . "\"}",
+            CanonicalJson::encode(["k\u{e9}" => $text])
+        );
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function invalidUtf8(): array
+    {
+        return [
+            'lone continuation byte' => ["a\x80b"],
+            'truncated two-byte sequence' => ["a\xc3"],
+            'truncated four-byte sequence' => ["\xf0\x9f\x98"],
+            'invalid lead byte' => ["\xff"],
+            'latin-1 e-acute' => ["caf\xe9"],
+            'overlong slash' => ["\xc0\xaf"],
+            'overlong three-byte slash' => ["\xe0\x80\xaf"],
+            'overlong four-byte' => ["\xf0\x80\x80\xaf"],
+            'surrogate high (CESU-8)' => ["\xed\xa0\x80"],
+            'surrogate low (CESU-8)' => ["\xed\xbf\xbf"],
+            'above U+10FFFF' => ["\xf4\x90\x80\x80"],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('invalidUtf8')]
+    public function testInvalidUtf8ValueIsRefused(string $bad): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('not valid UTF-8');
+
+        CanonicalJson::encode(['$tx' => ['v' => $bad]]);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('invalidUtf8')]
+    public function testInvalidUtf8ObjectKeyIsRefused(string $bad): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('not valid UTF-8');
+
+        CanonicalJson::encode([$bad => 1]);
+    }
+
+    public function testInvalidUtf8InsideAListIsRefused(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        CanonicalJson::bytes(['ok', ['deep' => "\xff"]]);
+    }
 }
