@@ -127,6 +127,9 @@ $restored = Secp256k1KeyPair::fromKeys($key->publicKey(), $key->privateKey());
 $verifier = Secp256k1KeyPair::fromPublicKey($key->publicKey());
 ```
 
+`fromKeys` checks that the public key is the one derived from the private key
+and throws if the pair does not match.
+
 secp256k1 uses `ext-openssl`, which is enabled in virtually every PHP build
 and is **the same implementation the ledger verifies with** — so interop is
 structural rather than hopeful. No Composer package, and no `ext-gmp` (which
@@ -209,8 +212,8 @@ $response = $client->submit($tx);
 
 if (!$response->committed()) {
     // NOT the HTTP status alone: the ledger answers 200 for a rejected
-    // transaction. A non-2xx status or a body that is not a JSON object is
-    // reported here as an error too.
+    // transaction. A non-2xx status, a body that is not a JSON object, or
+    // an object without a `$summary` object is reported here as an error too.
     print_r($response->errors());
 }
 ```
