@@ -42,6 +42,7 @@ final class CanonicalJson
      *
      * @param mixed $value
      * @throws CanonicalJsonException
+     * @throws \InvalidArgumentException if a string or object key is not valid UTF-8
      */
     public static function encode(mixed $value): string
     {
@@ -58,8 +59,8 @@ final class CanonicalJson
      */
     public static function bytes(mixed $value): string
     {
-        // PHP strings are byte strings, so this is already UTF-8 provided the
-        // source was. Kept as a named method so call sites read the same as
+        // PHP strings are byte strings; writeString() rejects any that are not
+        // valid UTF-8, so what comes out is UTF-8. Kept as a named method so call sites read the same as
         // in the other SDKs.
         return self::encode($value);
     }
@@ -258,6 +259,18 @@ final class CanonicalJson
      */
     private static function writeString(string &$out, string $value): void
     {
+        // A PHP string is just bytes. Invalid UTF-8 would be signed as-is,
+        // but the ledger decodes the request body as UTF-8 and re-stringifies
+        // it with U+FFFD in place of the bad bytes, so the signature could
+        // never verify (or the body would not be valid JSON at all). PCRE's
+        // UTF-8 check rejects overlong forms, surrogates and > U+10FFFF.
+        if (preg_match('//u', $value) !== 1) {
+            throw new \InvalidArgumentException(
+                'String is not valid UTF-8 (' . bin2hex(substr($value, 0, 16)) . '...). '
+                . 'Convert it first, for example with mb_convert_encoding($s, \'UTF-8\', $from).'
+            );
+        }
+
         // Most strings need no escaping at all, so check for that in one
         // native scan rather than visiting every byte from PHP.
         if (preg_match('/[\x00-\x1f"\\\\]/', $value) === 1) {
