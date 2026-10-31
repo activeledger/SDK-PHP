@@ -95,7 +95,13 @@ final class CanonicalJson
             // a browser: the ledger parses the JSON into a double either way,
             // so signing the unrounded value gives a signature it cannot
             // verify.
-            $out .= self::jsNumber((float) $value);
+            //
+            // Within 2**53 every integer is exact as a double and JavaScript
+            // prints it as plain digits, so skip the shortest-round-trip
+            // search that jsNumber() needs for fractions.
+            $out .= $value > -9007199254740992 && $value < 9007199254740992
+                ? (string) $value
+                : self::jsNumber((float) $value);
             return;
         }
         if (is_float($value)) {
