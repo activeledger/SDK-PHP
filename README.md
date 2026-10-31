@@ -105,10 +105,10 @@ requires to be NFKD-normalised.
 | Key type | Wire string | Public | Private | Signature | Encoding |
 |---|---|---|---|---|---|
 | ML-DSA-65 | `ml-dsa-65` | 1952 | 32-byte seed | 3309 | base64 |
-| secp256k1 | `secp256k1` | 33 or 65 | 32 | ~70-72, variable | `0x` hex |
+| secp256k1 | `secp256k1` | 33 or 65 | 32 | 68-71, variable | `0x` hex |
 
 Use **secp256k1** unless the identity must outlive a cryptographically
-relevant quantum computer: roughly **22x smaller** per transaction, and every
+relevant quantum computer: its signatures are far smaller, and every
 byte is stored on the ledger permanently and replicated to every node. It also
 works with hardware wallets and HSMs, is the only way to sign for an identity
 created before post-quantum support — and, unlike ML-DSA here, **its private
