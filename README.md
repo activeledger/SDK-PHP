@@ -127,6 +127,9 @@ $restored = Secp256k1KeyPair::fromKeys($key->publicKey(), $key->privateKey());
 $verifier = Secp256k1KeyPair::fromPublicKey($key->publicKey());
 ```
 
+`fromKeys` checks that the public key is the one derived from the private key
+and throws if the pair does not match.
+
 secp256k1 uses `ext-openssl`, which is enabled in virtually every PHP build
 and is **the same implementation the ledger verifies with** — so interop is
 structural rather than hopeful. No Composer package, and no `ext-gmp` (which

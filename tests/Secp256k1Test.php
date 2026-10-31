@@ -326,6 +326,65 @@ final class Secp256k1Test extends TestCase
         $key->privateKey();
     }
 
+    public function testFromKeysRejectsAPublicKeyThatIsNotThePrivateKeys(): void
+    {
+        $a = Secp256k1KeyPair::generate();
+        $b = Secp256k1KeyPair::generate();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('does not match the private key');
+        Secp256k1KeyPair::fromKeys($b->publicKey(), $a->privateKey());
+    }
+
+    public function testFromKeysRejectsAMismatchedUncompressedPair(): void
+    {
+        $a = Secp256k1KeyPair::generate(false);
+        $b = Secp256k1KeyPair::generate(false);
+
+        $this->expectException(\InvalidArgumentException::class);
+        Secp256k1KeyPair::fromKeys($b->publicKey(), $a->privateKey());
+    }
+
+    public function testFromKeysAcceptsEitherEncodingOfTheMatchingPublicKey(): void
+    {
+        foreach ([true, false] as $compressed) {
+            $key = Secp256k1KeyPair::generate($compressed);
+            $restored = Secp256k1KeyPair::fromKeys($key->publicKey(), $key->privateKey());
+            self::assertSame($key->publicKey(), $restored->publicKey());
+        }
+    }
+
+    /** @return array<string, array{string}> */
+    public static function malformedDer(): array
+    {
+        $ok = "\x30\x06\x02\x01\x01\x02\x01\x01";
+        return [
+            'valid' => [$ok],
+            'empty' => [''],
+            'outer length too long' => ["\x30\x20\x02\x01\x01\x02\x01\x01"],
+            'outer length too short' => ["\x30\x04\x02\x01\x01\x02\x01\x01"],
+            'r length runs past end' => ["\x30\x06\x02\x7f\x01\x02\x01\x01"],
+            's length runs past end' => ["\x30\x06\x02\x01\x01\x02\x05\x01"],
+            's truncated away' => ["\x30\x03\x02\x01\x01\x02\x01\x01"],
+            'long-form length' => ["\x30\x81\x06\x02\x01\x01\x02\x01\x01"],
+            'zero-length r' => ["\x30\x05\x02\x00\x02\x01\x01\x00"],
+            'oversized r' => ["\x30\x28\x02\x21" . str_repeat("\x01", 33) . "\x02\x01\x01"],
+            'trailing bytes' => ["\x30\x07\x02\x01\x01\x02\x01\x01\x00"],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('malformedDer')]
+    public function testIsHighSThrowsCleanlyOnMalformedDer(string $der): void
+    {
+        if ($der === "\x30\x06\x02\x01\x01\x02\x01\x01") {
+            self::assertFalse(Secp256k1KeyPair::isHighS($der));
+            return;
+        }
+
+        $this->expectException(\InvalidArgumentException::class);
+        Secp256k1KeyPair::isHighS($der);
+    }
+
     public function testMalformedSignatureReturnsFalse(): void
     {
         $v = $this->vectors()[0];

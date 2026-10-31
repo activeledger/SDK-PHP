@@ -232,6 +232,16 @@ final class Secp256k1KeyPair implements Signer
             ));
         }
 
+        // The two halves must belong together: a mismatched pair would sign
+        // with one key and publish another, and only fail later as signatures
+        // that never verify.
+        $derived = self::fromSeed($scalar, strlen($public) === self::PUBLIC_KEY_COMPRESSED_SIZE);
+        if (!hash_equals($derived->publicRaw, $public)) {
+            throw new \InvalidArgumentException(
+                'secp256k1 public key does not match the private key'
+            );
+        }
+
         return new self($public, $scalar);
     }
 
@@ -363,25 +373,39 @@ final class Secp256k1KeyPair implements Signer
      */
     private static function decodeDer(string $signature): array
     {
-        if (strlen($signature) < 8 || $signature[0] !== "\x30") {
+        $length = strlen($signature);
+        if ($length < 8 || $signature[0] !== "\x30") {
             throw new \InvalidArgumentException('signature is not a DER sequence');
         }
 
+        // Short-form length only: r and s are at most 33 bytes each.
+        if (ord($signature[1]) !== $length - 2) {
+            throw new \InvalidArgumentException('DER signature length does not match its content');
+        }
+
         $offset = 2;
-        if ($signature[$offset] !== "\x02") {
-            throw new \InvalidArgumentException('DER signature has no R component');
+        $parts = [];
+        foreach (['R', 'S'] as $name) {
+            if ($offset + 2 > $length || $signature[$offset] !== "\x02") {
+                throw new \InvalidArgumentException("DER signature has no $name component");
+            }
+            $integerLength = ord($signature[$offset + 1]);
+            if ($integerLength === 0 || $offset + 2 + $integerLength > $length) {
+                throw new \InvalidArgumentException("DER signature $name component is truncated or empty");
+            }
+            $value = ltrim(substr($signature, $offset + 2, $integerLength), "\0");
+            if (strlen($value) > self::PRIVATE_KEY_SIZE) {
+                throw new \InvalidArgumentException("DER signature $name component is too large");
+            }
+            $parts[] = $value;
+            $offset += 2 + $integerLength;
         }
-        $rLength = ord($signature[$offset + 1]);
-        $r = substr($signature, $offset + 2, $rLength);
 
-        $offset += 2 + $rLength;
-        if ($signature[$offset] !== "\x02") {
-            throw new \InvalidArgumentException('DER signature has no S component');
+        if ($offset !== $length) {
+            throw new \InvalidArgumentException('DER signature has trailing bytes');
         }
-        $sLength = ord($signature[$offset + 1]);
-        $s = substr($signature, $offset + 2, $sLength);
 
-        return [self::pad($r), self::pad($s)];
+        return [self::pad($parts[0]), self::pad($parts[1])];
     }
 
     private static function encodeDer(string $r, string $s): string
