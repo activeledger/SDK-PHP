@@ -9,6 +9,8 @@
 
 # Activeledger - PHP SDK
 
+**Documentation:** [SDK guide](https://activeledger.github.io/activeledger/sdks/php/) | [All SDKs](https://activeledger.github.io/activeledger/sdks/) | [Activeledger guide](https://activeledger.github.io/activeledger/)
+
 Build, sign and submit Activeledger transactions from PHP, with post-quantum
 identities.
 
