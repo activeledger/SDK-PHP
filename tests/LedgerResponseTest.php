@@ -97,13 +97,14 @@ final class LedgerResponseTest extends TestCase
             'scalar' => ['"ok"'],
             'number' => ['12'],
             'null' => ['null'],
+            'list' => ['[1,2]'],
+            'empty list' => ['[]'],
         ];
     }
 
     /**
-     * A body that is not a JSON object gives no errors, so committed() is
-     * true. Pinned so a change to that behaviour is a deliberate one.
-     *
+     * A body that is not a JSON object is an error, not a commit: an empty
+     * reply or a proxy's HTML page says nothing about the transaction.
      */
     #[DataProvider('nonObjectBodies')]
     public function testBodiesThatAreNotJsonObjectsParseToNothing(string $body): void
@@ -112,8 +113,44 @@ final class LedgerResponseTest extends TestCase
 
         self::assertNull($r->decoded());
         self::assertSame($body, $r->raw());
-        self::assertSame([], $r->errors());
+        self::assertSame(['Response body is not a JSON object'], $r->errors());
+        self::assertFalse($r->committed());
         self::assertSame([], $r->newStreams());
         self::assertSame([], $r->responses());
+    }
+
+    public function testAnEmptyObjectIsStillCommitted(): void
+    {
+        self::assertTrue((new LedgerResponse('{}', 200))->committed());
+    }
+
+    /**
+     * @return array<string, array{int}>
+     */
+    public static function failureStatuses(): array
+    {
+        return ['redirect' => [302], 'bad request' => [400], 'server error' => [500], 'unavailable' => [503], 'informational' => [100]];
+    }
+
+    #[DataProvider('failureStatuses')]
+    public function testANon2xxStatusIsNotCommittedEvenWithAnEmptyObject(int $status): void
+    {
+        $r = new LedgerResponse('{}', $status);
+
+        self::assertFalse($r->committed());
+        self::assertSame(["HTTP status $status"], $r->errors());
+    }
+
+    public function testNon2xxWithLedgerErrorsReportsTheLedgersErrors(): void
+    {
+        $r = new LedgerResponse('{"$summary":{"errors":["boom"]}}', 500);
+
+        self::assertSame(['boom'], $r->errors());
+    }
+
+    public function test2xxStatusesAreAccepted(): void
+    {
+        self::assertTrue((new LedgerResponse('{}', 200))->committed());
+        self::assertTrue((new LedgerResponse('{}', 204))->committed());
     }
 }

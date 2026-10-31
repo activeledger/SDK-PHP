@@ -276,6 +276,33 @@ final class Secp256k1Test extends TestCase
         }
     }
 
+    public function testAnUncompressedPointOffTheCurveIsRejected(): void
+    {
+        $point = hex2bin(substr(Secp256k1KeyPair::generate(false)->publicKey(), 2));
+        $point[64] = chr(ord($point[64]) ^ 1);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('not a point on the curve');
+        Secp256k1KeyPair::fromPublicKey('0x' . bin2hex($point));
+    }
+
+    public function testAnOffCurvePointIsRejectedByFromKeysToo(): void
+    {
+        $good = Secp256k1KeyPair::generate(false);
+        $point = hex2bin(substr($good->publicKey(), 2));
+        $point[64] = chr(ord($point[64]) ^ 1);
+
+        $this->expectException(\InvalidArgumentException::class);
+        Secp256k1KeyPair::fromKeys('0x' . bin2hex($point), $good->privateKey());
+    }
+
+    public function testACompressedXWithNoPointOnTheCurveIsRejected(): void
+    {
+        // x = 5: 5^3 + 7 = 132 is not a square mod p.
+        $this->expectException(\InvalidArgumentException::class);
+        Secp256k1KeyPair::fromPublicKey('0x02' . str_pad('5', 64, '0', STR_PAD_LEFT));
+    }
+
     public function testNonHexIsRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);

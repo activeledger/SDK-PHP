@@ -108,6 +108,21 @@ final class ClientTransportTest extends TestCase
         self::assertSame(['node said 503'], $response->errors());
     }
 
+    public function testAnErrorStatusWithANonJsonBodyIsNotCommitted(): void
+    {
+        $response = $this->client('/plain/502')->submitRaw('{}');
+
+        self::assertFalse($response->committed());
+        self::assertContains('HTTP status 502', $response->errors());
+    }
+
+    public function testANonJsonBodyAnsweredWithHttp200IsNotCommitted(): void
+    {
+        $response = $this->client('/plain/200')->submitRaw('{}');
+
+        self::assertFalse($response->committed());
+    }
+
     public function testConnectionRefusedIsARuntimeExceptionNamingTheNode(): void
     {
         $url = self::closedPortUrl();

@@ -463,11 +463,16 @@ final class Secp256k1KeyPair implements Signer
 
     private function publicPem(): string
     {
-        $prefix = strlen($this->publicRaw) === self::PUBLIC_KEY_COMPRESSED_SIZE
+        return self::publicPemFor($this->publicRaw);
+    }
+
+    private static function publicPemFor(string $raw): string
+    {
+        $prefix = strlen($raw) === self::PUBLIC_KEY_COMPRESSED_SIZE
             ? self::SPKI_COMPRESSED
             : self::SPKI_UNCOMPRESSED;
 
-        return self::pem('PUBLIC KEY', hex2bin($prefix) . $this->publicRaw);
+        return self::pem('PUBLIC KEY', hex2bin($prefix) . $raw);
     }
 
     private function privatePem(): string
@@ -561,6 +566,15 @@ final class Secp256k1KeyPair implements Signer
                 self::PUBLIC_KEY_COMPRESSED_SIZE,
                 self::PUBLIC_KEY_UNCOMPRESSED_SIZE
             ));
+        }
+
+        // Right length and prefix is not a point: an x/y pair off the curve
+        // (or an x with no y) would otherwise be stored and only fail later,
+        // as a signature that never verifies. OpenSSL refuses to load one.
+        if (@openssl_pkey_get_public(self::publicPemFor($raw)) === false) {
+            throw new \InvalidArgumentException(
+                'secp256k1 public key is not a point on the curve'
+            );
         }
     }
 }
